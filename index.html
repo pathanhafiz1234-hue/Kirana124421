@@ -256,11 +256,19 @@ function setTab(t,np){
   bar(); if(!shop)loadMy();
 }
 $("tShop").onclick=function(){setTab("shop")};$("tOrd").onclick=function(){setTab("ord")};$("mref").onclick=loadMy;
+var lastItems="";
 function loadItems(){
+  if(!items.length){
+    try{var c=JSON.parse(localStorage.getItem("items")||"null");if(c&&c.length){items=c;lastItems=JSON.stringify(c);renderGrid()}}catch(e){}
+  }
+  if(!items.length)$("grid").innerHTML='<div class="empty">Loading products...</div>';
   fetch(CFG.URL+"/rest/v1/items?select=*&active=eq.true&order=name",{headers:H})
    .then(function(r){if(!r.ok)throw 0;return r.json()})
-   .then(function(d){items=d;renderGrid()})
-   .catch(function(){$("grid").innerHTML='<div class="empty">Unable to load products</div>'});
+   .then(function(d){
+     var j=JSON.stringify(d); if(j===lastItems)return;
+     lastItems=j;items=d;try{localStorage.setItem("items",j)}catch(e){}renderGrid();
+   })
+   .catch(function(){if(!items.length)$("grid").innerHTML='<div class="empty">Unable to load products</div>'});
 }
 function renderGrid(){
   if(!items.length){$("grid").innerHTML='<div class="empty">No products available</div>';return}
@@ -362,32 +370,38 @@ $("lbtn").onclick=function(){
 };
 $("lout").onclick=function(){api({action:"logout",token:token}).catch(function(){}).then(function(){setTok(null);ownerInit()})};
 
+function renderOwnerItems(r){
+  window._oi=r.items;
+  $("oitems").innerHTML = r.items.length ? r.items.map(function(it){
+    return '<div class="card"><div class="row" style="justify-content:flex-start;gap:12px">'+thumb(it,"th")
+     +'<div style="flex:1"><b>'+esc(it.name)+'</b><div class="mut">per '+it.unit+(it.active?"":" &middot; hidden")+'</div></div></div>'
+     +'<div class="oa"><div class="pf" style="flex:1.3"><span>Rs</span><input type="number" min="0" step="any" inputmode="decimal" value="'+it.price+'" id="p'+it.id+'"></div>'
+     +'<button class="btn" data-up="'+it.id+'">Update</button></div>'
+     +'<div class="oa"><label class="btn alt">Photo<input type="file" accept="image/*" hidden data-ph="'+it.id+'"></label>'
+     +'<button class="btn alt" data-tg="'+it.id+'">'+(it.active?"Hide":"Show")+'</button>'
+     +'<button class="btn bad" data-del="'+it.id+'">Delete</button></div></div>';
+  }).join("") : '<div class="mut">No products yet</div>';
+}
+function renderOwnerOrders(r){
+  window._oo={};
+  $("oorders").innerHTML = r.orders.length ? r.orders.map(function(o){
+    window._oo[o.id]=o;
+    return '<div class="card'+(o.placed?' done':'')+'"><div class="row"><b>#'+o.id+' &middot; '+esc(o.customer)+'</b>'+(o.placed?'<span class="chip ok2">&#10003; PLACED</span>':'<span class="chip pend">NEW</span>')+'</div>'
+      +'<div class="mut" style="margin-bottom:4px">'+dt(o.created_at)+'</div>'+linesHtml(o.lines)
+      +'<div class="tot"><span>Total</span><span>'+money(o.total)+'</span></div>'
+      +'<div class="mut">'+esc(o.phone)+'<br>'+esc(o.address)+'</div>'
+      +'<div class="oa"><button class="btn'+(o.placed?' alt':'')+'" data-pl="'+o.id+'">'+(o.placed?'Undo':'&#10003; Order placed')+'</button>'
+      +'<button class="btn bad" data-od="'+o.id+'">Delete</button></div></div>';
+  }).join("") : '<div class="mut">No orders yet</div>';
+}
 function loadOwner(){
-  api({action:"owner_items",token:token}).then(function(r){
-    $("login").classList.add("hide");$("panel").classList.remove("hide");
-    window._oi=r.items;
-    $("oitems").innerHTML = r.items.length ? r.items.map(function(it){
-      return '<div class="card"><div class="row" style="justify-content:flex-start;gap:12px">'+thumb(it,"th")
-       +'<div style="flex:1"><b>'+esc(it.name)+'</b><div class="mut">per '+it.unit+(it.active?"":" &middot; hidden")+'</div></div></div>'
-       +'<div class="oa"><div class="pf" style="flex:1.3"><span>Rs</span><input type="number" min="0" step="any" inputmode="decimal" value="'+it.price+'" id="p'+it.id+'"></div>'
-       +'<button class="btn" data-up="'+it.id+'">Update</button></div>'
-       +'<div class="oa"><label class="btn alt">Photo<input type="file" accept="image/*" hidden data-ph="'+it.id+'"></label>'
-       +'<button class="btn alt" data-tg="'+it.id+'">'+(it.active?"Hide":"Show")+'</button>'
-       +'<button class="btn bad" data-del="'+it.id+'">Delete</button></div></div>';
-    }).join("") : '<div class="mut">No products yet</div>';
-    return api({action:"orders",token:token});
-  }).then(function(r){
-    window._oo={};
-    $("oorders").innerHTML = r.orders.length ? r.orders.map(function(o){
-      window._oo[o.id]=o;
-      return '<div class="card'+(o.placed?' done':'')+'"><div class="row"><b>#'+o.id+' &middot; '+esc(o.customer)+'</b>'+(o.placed?'<span class="chip ok2">&#10003; PLACED</span>':'<span class="chip pend">NEW</span>')+'</div>'
-        +'<div class="mut" style="margin-bottom:4px">'+dt(o.created_at)+'</div>'+linesHtml(o.lines)
-        +'<div class="tot"><span>Total</span><span>'+money(o.total)+'</span></div>'
-        +'<div class="mut">'+esc(o.phone)+'<br>'+esc(o.address)+'</div>'
-        +'<div class="oa"><button class="btn'+(o.placed?' alt':'')+'" data-pl="'+o.id+'">'+(o.placed?'Undo':'&#10003; Order placed')+'</button>'
-        +'<button class="btn bad" data-od="'+o.id+'">Delete</button></div></div>';
-    }).join("") : '<div class="mut">No orders yet</div>';
-  }).catch(auth);
+  $("login").classList.add("hide");$("panel").classList.remove("hide");
+  if(!$("oitems").innerHTML)$("oitems").innerHTML='<div class="mut">Loading...</div>';
+  if(!$("oorders").innerHTML)$("oorders").innerHTML='<div class="mut">Loading...</div>';
+  api({action:"owner_items",token:token}).then(renderOwnerItems)
+   .catch(function(e){if(e.status===401)auth(e);else $("oitems").innerHTML='<div class="err">'+esc(e.message)+'</div>'});
+  api({action:"orders",token:token}).then(renderOwnerOrders)
+   .catch(function(e){if(e.status===401)auth(e);else $("oorders").innerHTML='<div class="err">'+esc(e.message)+'</div>'});
 }
 function saveItem(r){return api({action:"save_item",token:token,id:r.id,name:r.name,unit:r.unit,price:r.price,active:r.active,image:r.image})}
 
@@ -442,6 +456,7 @@ $("oorders").addEventListener("click",function(e){
   p.then(loadOwner).catch(auth);
 });
 
+loadItems(); // start loading products as soon as the page opens
 /* ---------- Phone back button ---------- */
 try{history.replaceState({v:"land",sh:0},"")}catch(e){}
 window.addEventListener("popstate",function(e){
