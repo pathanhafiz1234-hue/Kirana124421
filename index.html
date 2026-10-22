@@ -160,7 +160,7 @@ footer{text-align:center;margin:22px 0}
       </div>
     </div>
     <div id="panel" class="hide">
-      <div class="row"><span class="mut">Signed in</span><button class="btn alt sm" id="lout">Sign out</button></div>
+      <div class="row"><span class="mut">Signed in</span><span style="display:flex;gap:6px"><button class="btn alt sm" id="ntest">Test notification</button><button class="btn alt sm" id="lout">Sign out</button></span></div>
 
       <h2 style="margin-top:14px">Add new product</h2>
       <div class="card f">
@@ -367,6 +367,11 @@ $("lbtn").onclick=function(){
   $("lerr").textContent=""; $("lbtn").disabled=true;
   api({action:"login",password:$("pw").value}).then(function(r){setTok(r.token);$("pw").value="";loadOwner()})
    .catch(function(e){$("lerr").textContent=e.message}).then(function(){$("lbtn").disabled=false});
+};
+$("ntest").onclick=function(){
+  var b=$("ntest");b.disabled=true;b.textContent="Sending...";
+  api({action:"test_ntfy",token:token}).then(function(r){alert(r.info)}).catch(function(e){if(e.status===401)auth(e);else alert(e.message)})
+   .then(function(){b.disabled=false;b.textContent="Test notification"});
 };
 $("lout").onclick=function(){api({action:"logout",token:token}).catch(function(){}).then(function(){setTok(null);ownerInit()})};
 
